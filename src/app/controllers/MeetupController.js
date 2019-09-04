@@ -1,10 +1,33 @@
 import * as Yup from 'yup';
-import { isBefore, parseISO } from 'date-fns';
+import { startOfDay, endOfDay, parseISO } from 'date-fns';
+import { Op } from 'sequelize';
 import Meetup from '../models/Meetup';
+import User from '../models/User';
 
 class MeetupController {
   async index(req, res) {
-    const meetups = await Meetup.findAll();
+    const { page = 1, date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ error: 'date parameter is necessary' })
+    }
+    const searchDate = parseISO(date);
+
+    const meetups = await Meetup.findAll({
+      where: {
+        date: {
+          [Op.between]: [startOfDay(searchDate), endOfDay(searchDate)]
+        }
+      },
+      limit: 10,
+      offset: (page - 1) * 10,
+      include: [
+        {
+          model: User,
+          attributes: ['name', 'email']
+        }
+      ]
+    });
     return res.json(meetups);
   }
 
@@ -72,6 +95,27 @@ class MeetupController {
     const meetupUpdated = await meetup.update(req.body);
     return res.status(400).json(meetupUpdated);
 
+  }
+
+  async delete(req, res) {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: 'invalid operation' });
+    }
+
+    const meetup = await Meetup.findByPk(id);
+
+    if (!meetup) {
+      return res.status(400).json({ error: 'meetup not found' });
+    }
+
+    if (meetup.user_id !== req.userId) {
+      return res.status(400).json({ error: 'update meetup of another user is not possible' })
+    }
+
+    await meetup.destroy();
+    return res.json(meetup);
   }
 }
 

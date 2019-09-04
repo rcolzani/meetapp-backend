@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import express from 'express';
 import * as Sentry from '@sentry/node';
 import sentryConfig from './config/sentry';
